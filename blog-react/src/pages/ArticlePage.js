@@ -1,89 +1,103 @@
-import React, { useState } from 'react';
+// src/pages/ArticlePage.js
+import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { Card, Typography, List, Input, Button, message, Space, Avatar } from 'antd';
+import { Card, Typography, List, Input, Button, message, Space, Avatar, Spin, Comment } from 'antd';
 import { UserOutlined, EyeOutlined, MessageOutlined } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
+import { getArticle, getComments, createComment } from '../api/articleService';
 
 const { Title, Paragraph } = Typography;
 const { TextArea } = Input;
 
-// 模拟文章数据
-const mockArticle = {
-  id: 1,
-  title: '我的第一篇博客文章',
-  content: `这是一篇示例文章的内容。在这里可以写任何你想写的内容。
-
-## 标题二
-
-这是一个段落，可以包含**粗体**和*斜体*文字。
-
-1. 这是一个有序列表项
-2. 这是另一个有序列表项
-
-> 这是一个引用块
-
-\`\`\`javascript
-// 这是一段代码示例
-function hello() {
-  console.log('Hello, world!');
-}
-\`\`\``,
-  author: '张三',
-  createdAt: '2023-07-01 12:00:00',
-  views: 128
-};
-
-// 模拟评论数据
-const mockComments = [
-  {
-    id: 1,
-    content: '这是一篇很棒的文章，学到了很多！',
-    author: '李四',
-    createdAt: '2023-07-01 15:30:00'
-  },
-  {
-    id: 2,
-    content: '感谢分享，期待更多好文章。',
-    author: '王五',
-    createdAt: '2023-07-02 09:15:00'
-  }
-];
-
 const ArticlePage = () => {
-  const { id } = useParams(); // 保留 useParams 以保持路由功能一致性
-  const [comments, setComments] = useState(mockComments);
+  const { id } = useParams();
+  const [article, setArticle] = useState(null);
+  const [comments, setComments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [commentLoading, setCommentLoading] = useState(false);
   const [newComment, setNewComment] = useState('');
 
-  const handleCommentSubmit = () => {
+  useEffect(() => {
+    fetchArticle();
+    fetchComments();
+  }, [id]);
+
+  const fetchArticle = async () => {
+    try {
+      setLoading(true);
+      const response = await getArticle(id);
+      if (response.success) {
+        setArticle(response.data);
+      } else {
+        message.error(response.message || '获取文章失败');
+      }
+    } catch (error) {
+      message.error('获取文章失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchComments = async () => {
+    try {
+      const response = await getComments(id);
+      if (response.success) {
+        setComments(response.data.comments);
+      } else {
+        message.error(response.message || '获取评论失败');
+      }
+    } catch (error) {
+      message.error('获取评论失败');
+    }
+  };
+
+  const handleCommentSubmit = async () => {
     if (!newComment.trim()) {
       message.warning('请输入评论内容');
       return;
     }
 
-    const comment = {
-      id: comments.length + 1,
-      content: newComment,
-      author: '当前用户',
-      createdAt: new Date().toLocaleString()
-    };
-
-    setComments([comment, ...comments]);
-    setNewComment('');
-    message.success('评论发表成功');
+    try {
+      setCommentLoading(true);
+      const response = await createComment(id, { content: newComment });
+      if (response.success) {
+        message.success('评论发表成功');
+        setNewComment('');
+        fetchComments(); // 重新获取评论列表
+      } else {
+        message.error(response.message || '评论发表失败');
+      }
+    } catch (error) {
+      message.error('评论发表失败');
+    } finally {
+      setCommentLoading(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '50px' }}>
+        <Spin size="large" />
+      </div>
+    );
+  }
+
+  if (!article) {
+    return <div>文章不存在</div>;
+  }
 
   return (
     <div>
       <Card>
-        <Title level={2}>{mockArticle.title}</Title>
+        <Title level={2}>{article.title}</Title>
         <Space style={{ marginBottom: '20px' }}>
-          <span><UserOutlined /> {mockArticle.author}</span>
-          <span>{mockArticle.createdAt}</span>
-          <span><EyeOutlined /> {mockArticle.views}</span>
+          <span><UserOutlined /> {article.author?.username || article.author}</span>
+          <span>{new Date(article.created_at).toLocaleString()}</span>
+          <span><EyeOutlined /> {article.views}</span>
           <span><MessageOutlined /> {comments.length}</span>
         </Space>
         <Paragraph>
-          <ReactMarkdown>{mockArticle.content}</ReactMarkdown>
+          <ReactMarkdown>{article.content}</ReactMarkdown>
         </Paragraph>
       </Card>
 
@@ -97,6 +111,7 @@ const ArticlePage = () => {
         <Button
           type="primary"
           onClick={handleCommentSubmit}
+          loading={commentLoading}
           style={{ marginTop: '10px' }}
         >
           发表评论
@@ -112,8 +127,8 @@ const ArticlePage = () => {
                 <Avatar icon={<UserOutlined />} style={{ marginRight: '12px' }} />
                 <div>
                   <div>
-                    <span style={{ fontWeight: 'bold', marginRight: '8px' }}>{item.author}</span>
-                    <span style={{ fontSize: '12px', color: '#999' }}>{item.createdAt}</span>
+                    <span style={{ fontWeight: 'bold', marginRight: '8px' }}>{item.author?.username || item.author}</span>
+                    <span style={{ fontSize: '12px', color: '#999' }}>{new Date(item.created_at).toLocaleString()}</span>
                   </div>
                   <div style={{ marginTop: '4px' }}>{item.content}</div>
                 </div>

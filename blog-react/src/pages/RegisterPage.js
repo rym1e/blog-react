@@ -1,26 +1,40 @@
+// src/pages/RegisterPage.js
 import React, { useState } from 'react';
-import { Form, Input, Button, Card, message, Typography } from 'antd';
+import { Form, Input, Button, message, Card, Typography } from 'antd';
 import { UserOutlined, LockOutlined, MailOutlined } from '@ant-design/icons';
+import { Link, useNavigate } from 'react-router-dom';
+import { register } from '../api/authService';
 
 const { Title } = Typography;
 
 const RegisterPage = () => {
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
-  const onFinish = (values) => {
-    setLoading(true);
-    // 模拟注册请求
-    setTimeout(() => {
+  const onFinish = async (values) => {
+    try {
+      setLoading(true);
+      const response = await register(values);
+      
+      if (response.success) {
+        // 保存 token 到 localStorage
+        localStorage.setItem('token', response.data.token);
+        message.success('注册成功');
+        navigate('/'); // 跳转到首页
+      } else {
+        message.error(response.message || '注册失败');
+      }
+    } catch (error) {
+      message.error('注册失败');
+    } finally {
       setLoading(false);
-      message.success('注册成功');
-      console.log('Received values of form: ', values);
-    }, 1000);
+    }
   };
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', marginTop: '50px' }}>
-      <Card style={{ width: 400 }}>
-        <Title level={3} style={{ textAlign: 'center' }}>用户注册</Title>
+    <div style={{ maxWidth: '400px', margin: '100px auto', padding: '0 20px' }}>
+      <Card>
+        <Title level={2} style={{ textAlign: 'center' }}>用户注册</Title>
         <Form
           name="register"
           onFinish={onFinish}
@@ -35,49 +49,29 @@ const RegisterPage = () => {
             name="email"
             rules={[
               { required: true, message: '请输入邮箱!' },
-              { type: 'email', message: '邮箱格式不正确!' }
+              { type: 'email', message: '请输入有效的邮箱地址!' }
             ]}
           >
             <Input prefix={<MailOutlined />} placeholder="邮箱" />
           </Form.Item>
           <Form.Item
             name="password"
-            rules={[{ required: true, message: '请输入密码!' }]}
-          >
-            <Input
-              prefix={<LockOutlined />}
-              type="password"
-              placeholder="密码"
-            />
-          </Form.Item>
-          <Form.Item
-            name="confirm"
-            dependencies={['password']}
             rules={[
-              { required: true, message: '请确认密码!' },
-              ({ getFieldValue }) => ({
-                validator(_, value) {
-                  if (!value || getFieldValue('password') === value) {
-                    return Promise.resolve();
-                  }
-                  return Promise.reject(new Error('两次输入的密码不一致!'));
-                },
-              }),
+              { required: true, message: '请输入密码!' },
+              { min: 6, message: '密码至少6位!' }
             ]}
           >
-            <Input
-              prefix={<LockOutlined />}
-              type="password"
-              placeholder="确认密码"
-            />
+            <Input prefix={<LockOutlined />} type="password" placeholder="密码" />
           </Form.Item>
           <Form.Item>
             <Button type="primary" htmlType="submit" loading={loading} block>
               注册
             </Button>
-            或 <a href="/login">已有账户?立即登录!</a>
           </Form.Item>
         </Form>
+        <div style={{ textAlign: 'center' }}>
+          <Link to="/login">已有账号？立即登录</Link>
+        </div>
       </Card>
     </div>
   );
